@@ -12,7 +12,7 @@ import { globalError } from "./utils/asyncHandelar.js"
 
 const bootstrap = (app, express) => {
     app.use((req, res, next) => {
-        if (req.originalUrl == "/order/webhock") {
+        if (req.originalUrl == "/order/webhook") {
             return next()
         }else{
             express.json({})(req, res, next)
