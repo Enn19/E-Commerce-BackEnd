@@ -10,7 +10,7 @@ export const addOrder = asyncHandler(async (req, res, next) => {
     const { _id } = req.user;
     let { products, couponName } = req.body;
     let coupon = { amount: 0 };
-    let amount = 0; // Define the amount variable here
+    let amount = 0;
     if (couponName) {
         coupon = await couponModel.findOne({ name: couponName, usedBy: { $nin: _id } });
         if (!coupon) {
@@ -20,7 +20,7 @@ export const addOrder = asyncHandler(async (req, res, next) => {
             return next(new Error(" expire date for coupon ", { cause: 400 }));
         }
         req.body.couponId = coupon._id;
-        amount = coupon.amount; // Assign the coupon amount to the amount variable
+        amount = coupon.amount;
     }
     if (!products?.length) {
         const cart = await cartModel.findOne({ userId: _id });
@@ -114,9 +114,7 @@ export const addOrder = asyncHandler(async (req, res, next) => {
         return res.status(201).json({ message: "Order created", order, session });
     }
     return res.status(201).json({ message: "Order created", order });
-});
-
-
+})
 //cancel order
 export const cancelOrder = asyncHandler(async (req, res, next) => {
     const { orderId } = req.params
@@ -154,3 +152,25 @@ export const deliverdOrder = asyncHandler(async (req, res, next) => {
     return res.status(200).json({ message: "Done", updateOrder });
 }
 )
+//webhock
+export const webHockOrder = asyncHandler(async (request, response, next) => {
+    const stripe = new Stripe(process.env.API_KEY_PAYMENT)
+    // This is your Stripe CLI webhook secret for testing your endpoint locally.
+    const endpointSecret = process.env.END_POINT_SECRET
+    const sig = request.headers['stripe-signature'];
+    let event;
+    try {
+        event = stripe.webhooks.constructEvent(request.body, sig, endpointSecret);
+    } catch (err) {
+        response.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    if (event.type == 'checkout.session.completed') {
+        let id = event.data.object.metadata.orderId
+        const updateOrder = await orderModel.updateOne({ _id: id }, { status: "placed" })
+        return response.status(200).json({ message: "Done", updateOrder });
+
+    }
+    return next(new Error(" failed to payment  ", { cause: 500 }))
+})
